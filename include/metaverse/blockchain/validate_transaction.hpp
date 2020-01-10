@@ -144,6 +144,7 @@ private:
     std::vector<chain::asset_cert_type> asset_certs_in_;
     std::string old_symbol_in_; // used for check same asset/did/mit symbol in previous outputs
     std::string old_cert_symbol_in_; // used for check same cert symbol in previous outputs
+    std::set<std::string> mits_symbol_in_;// used for check duplicate mit symbol in previous outputs
     uint32_t current_input_;
     chain::point::indexes unconfirmed_;
     validate_handler handle_validate_;

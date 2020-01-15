@@ -965,6 +965,9 @@ code validate_transaction::check_asset_mit_transaction() const
     std::string asset_address;
     uint64_t num_mit_transfer = 0;
     uint64_t num_mit_register = 0;
+
+    std::set<std::string> mits_transfer_symbol_in;
+    std::set<std::string> mits_transfer_symbol_out;
     for (auto& output : tx.outputs)
     {
         if (output.is_asset_mit_register()) {
@@ -988,13 +991,15 @@ code validate_transaction::check_asset_mit_transaction() const
             }
         }
         else if (output.is_asset_mit_transfer()) {
-            if (++num_mit_transfer > 1) {
-                log::debug(LOG_BLOCKCHAIN) << "transfer MIT: more than on MIT output." << output.to_string(1);
-                return error::mit_error;
-            }
+            ++num_mit_transfer;
 
             auto&& asset_info = output.get_asset_mit();
-            asset_symbol = asset_info.get_symbol();
+
+            if (mits_transfer_symbol_out.find(asset_info.get_symbol()) != mits_transfer_symbol_out.end()) {
+                log::debug(LOG_BLOCKCHAIN) << "transfer MIT: should not be two mit outputs with the same mit symbol on MIT output.";
+                return error::mit_error;
+            }
+            mits_transfer_symbol_out.insert(asset_info.get_symbol());
         }
         else if (output.is_etp()) {
             if (!check_same(asset_address, output.get_script_address())) {
@@ -1039,19 +1044,13 @@ code validate_transaction::check_asset_mit_transaction() const
         }
         else if (prev_output.is_asset_mit()) {
             auto&& asset_info = prev_output.get_asset_mit();
-            if (asset_symbol != asset_info.get_symbol()) {
-                log::debug(LOG_BLOCKCHAIN) << "MIT: invalid MIT to transfer: "
-                                            << asset_info.get_symbol() << " != " << asset_symbol;
-                return error::validate_inputs_failed;
-            }
-
-            has_input_transfer = true;
+            mits_transfer_symbol_in.insert(asset_info.get_symbol());
         }
     }
 
-    if (num_mit_transfer > 0 && !has_input_transfer) {
-        log::debug(LOG_BLOCKCHAIN) << "MIT: no input MIT to transfer " << asset_symbol;
-        return error::validate_inputs_failed;
+    if (num_mit_transfer > 0 && mits_transfer_symbol_in != mits_transfer_symbol_out) {
+        log::debug(LOG_BLOCKCHAIN) << "MIT: input/output MIT no exact match to transfer " << asset_symbol;
+        return error::mit_error;
     }
 
     return error::success;
@@ -1819,9 +1818,11 @@ bool validate_transaction::connect_input( const transaction& previous_tx, uint64
         }
     }
     else if (previous_output.is_asset_mit()) {
-        if (!check_same(old_symbol_in_, previous_output.get_asset_mit_symbol())) {
+        if ( mits_symbol_in_.find(previous_output.get_asset_mit_symbol()) != mits_symbol_in_.end() ) {
+            log::debug(LOG_BLOCKCHAIN) << "transfer MIT: should not be two mit inputs with the same mit symbol on MIT input.";
             return false;
         }
+        mits_symbol_in_.insert(previous_output.get_asset_mit_symbol());
     }
     else if (previous_output.is_did()) {
         // 1. do did symbol check
@@ -2078,23 +2079,23 @@ bool validate_transaction::check_asset_certs(const transaction& tx) const
 bool validate_transaction::check_asset_mit(const transaction& tx) const
 {
     uint64_t num_mit = 0;
+    std::set<std::string> mits_symbol_out;
     for (const auto& output : tx.outputs) {
         if (output.is_asset_mit_transfer()) {
-            if (++num_mit > 1) {
-                return false;
-            }
-
+            ++num_mit;
+            
             auto&& asset_info = output.get_asset_mit();
-            if (old_symbol_in_ != asset_info.get_symbol()) {
+            if (mits_symbol_out.find(asset_info.get_symbol()) != mits_symbol_out.end()) {                
                 return false;
             }
+            mits_symbol_out.insert(asset_info.get_symbol());
         }
         else if (!output.is_etp() && !output.is_message()) {
             return false;
         }
     }
 
-    return (num_mit == 1);
+    return true;
 }
 
 bool validate_transaction::check_did_symbol_match(const transaction& tx) const

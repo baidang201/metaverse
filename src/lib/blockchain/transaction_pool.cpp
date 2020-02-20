@@ -57,6 +57,9 @@ transaction_pool::transaction_pool(threadpool& pool, block_chain& chain,
 transaction_pool::~transaction_pool()
 {
     clear(error::service_stopped);
+
+    blacklist_tx_hash_queue_.clear();
+    blacklist_tx_hash_sets_.clear();
 }
 
 void transaction_pool::start()

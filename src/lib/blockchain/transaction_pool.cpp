@@ -40,6 +40,8 @@ using namespace std::placeholders;
 
 using string = std::string;
 
+static BC_CONSTEXPR uint32_t black_list_size = 500;
+
 transaction_pool::transaction_pool(threadpool& pool, block_chain& chain,
                                    const settings& settings)
     : stopped_(true),
@@ -283,6 +285,22 @@ code transaction_pool::check_symbol_repeat(transaction_ptr tx)
     return (ec.value() != error::success) ? ec : check_outputs(tx);
 }
 
+void transaction_pool::add_tx_black_list(const hash_digest& tx_hash)
+{
+    if (blacklist_tx_hash_sets_.count(tx_hash))
+    {
+        return;
+    }
+
+    if (blacklist_tx_hash_queue_.size() >= black_list_size)
+    {
+        blacklist_tx_hash_sets_.erase(blacklist_tx_hash_queue_.front());
+        blacklist_tx_hash_queue_.pop();
+    }
+    blacklist_tx_hash_queue_.push(tx_hash);
+    blacklist_tx_hash_sets_.insert(tx_hash);
+}
+
 // handle_confirm will never fire if handle_validate returns a failure code.
 void transaction_pool::store(transaction_ptr tx,
                              confirm_handler handle_confirm, validate_handler handle_validate)
@@ -306,6 +324,12 @@ void transaction_pool::do_store(const code& ec, transaction_ptr tx,
     if (ec)
     {
         handle_validate(ec, tx, {});
+        return;
+    }
+
+    auto& tx_ = *tx;
+    if (blacklist_tx_hash_sets_.count(tx_.hash()))
+    {
         return;
     }
 

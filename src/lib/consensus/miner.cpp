@@ -210,6 +210,7 @@ bool miner::get_transaction(
 #endif
                         i = transactions.erase(i);
                         node_.pool().delete_tx(hash);
+                        node_.pool().add_tx_black_list(hash);
                         transaction_is_ok = false;
                         break;
                     }

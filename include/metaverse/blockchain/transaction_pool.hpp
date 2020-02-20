@@ -24,6 +24,7 @@
 #include <atomic>
 #include <cstddef>
 #include <functional>
+#include <mutex>
 #include <boost/circular_buffer.hpp>
 #include <metaverse/bitcoin.hpp>
 #include <metaverse/blockchain/define.hpp>
@@ -85,6 +86,7 @@ public:
     void validate(transaction_ptr tx, validate_handler handler);
     void store(transaction_ptr tx, confirm_handler confirm_handler,
         validate_handler validate_handler);
+    void add_tx_black_list(const hash_digest& tx_hash);
 
     /// Subscribe to transaction acceptance into the mempool.
     void subscribe_transaction(transaction_handler handler);
@@ -138,6 +140,9 @@ protected:
     // The buffer is protected by non-concurrent dispatch.
     buffer buffer_;
     std::atomic<bool> stopped_;
+    mutable std::mutex mut;
+    std::queue<hash_digest> blacklist_tx_hash_queue_;
+    std::set<hash_digest> blacklist_tx_hash_sets_;
 
 private:
     // Unsafe methods limited to friend caller.

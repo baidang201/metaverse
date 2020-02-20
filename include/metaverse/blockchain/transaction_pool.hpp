@@ -24,7 +24,6 @@
 #include <atomic>
 #include <cstddef>
 #include <functional>
-#include <mutex>
 #include <boost/circular_buffer.hpp>
 #include <metaverse/bitcoin.hpp>
 #include <metaverse/blockchain/define.hpp>
@@ -140,7 +139,6 @@ protected:
     // The buffer is protected by non-concurrent dispatch.
     buffer buffer_;
     std::atomic<bool> stopped_;
-    mutable std::mutex mut;
     std::queue<hash_digest> blacklist_tx_hash_queue_;
     std::set<hash_digest> blacklist_tx_hash_sets_;
 
